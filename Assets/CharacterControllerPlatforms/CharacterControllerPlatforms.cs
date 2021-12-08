@@ -5,22 +5,66 @@ using UnityEngine;
 public class CharacterControllerPlatforms : MonoBehaviour
 {
     public CharacterController characterController;
+    public float speed = 3.0f;
+    public float rotateSpeed = 3.0f;
+    public float jump = 3.0f;
     Collider platform;
-    Vector3 hitPoint;
     Vector3 localPoint;
+    Vector3 velocity;
 
-    private void Update()
+    Vector3 SurfacePoint(Collider collider)
+    {
+        Vector3 surfacePoint = collider.ClosestPoint(transform.position);
+        return platform.transform.InverseTransformPoint(surfacePoint);
+    }
+
+    void Update()
     {
         Vector3 move = Vector3.zero;
-        Debug.Log(platform);
-        if (platform != null)
+
+        // Move character with platform
+        if (characterController.isGrounded && platform != null)
         {
-            Vector3 newPoint = transform.TransformPoint(localPoint);
-            move = characterController.transform.InverseTransformDirection(newPoint - hitPoint);
-            Debug.Log(move);
+            Vector3 newPoint = platform.transform.TransformPoint(localPoint);
+            move = newPoint + Vector3.up * (characterController.height - characterController.skinWidth) * 0.5f - transform.position;
         }
-        platform = null;
-        characterController.SimpleMove(move);
+
+        // Handle jump
+        if (characterController.isGrounded)
+        {
+            if (velocity.y < 0.0f)
+            {
+                velocity.y = 0.0f;
+            }
+            if (Input.GetButtonDown("Jump"))
+            {
+                velocity.y += jump;
+            }
+        }
+        else
+        {
+            velocity += Physics.gravity * Time.deltaTime;
+        }
+
+        // Rotate around y - axis
+        transform.Rotate(0, Input.GetAxis("Horizontal") * rotateSpeed * Time.deltaTime, 0);
+
+        // Move forward / backward
+        Vector3 forward = transform.TransformDirection(Vector3.forward);
+        float curSpeed = speed * Input.GetAxis("Vertical");
+        move += (forward * curSpeed + velocity) * Time.deltaTime;
+        characterController.Move(move);
+        if (characterController.isGrounded)
+        {
+            if (platform != null)
+            {
+                localPoint = SurfacePoint(platform);
+            }
+        }
+        else
+        {
+            platform = null;
+        }
     }
 
     void OnControllerColliderHit(ControllerColliderHit controllerColliderHit)
@@ -28,9 +72,7 @@ public class CharacterControllerPlatforms : MonoBehaviour
         if (controllerColliderHit.collider.CompareTag("Platform"))
         {
             platform = controllerColliderHit.collider;
-            Debug.Log(platform);
-            hitPoint = controllerColliderHit.point;
-            localPoint = transform.InverseTransformPoint(hitPoint);
+            localPoint = SurfacePoint(platform);
         }
     }
 }
